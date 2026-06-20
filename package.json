@@ -1,7 +1,7 @@
 {
   "name": "claude-prompt-meter",
   "displayName": "Claude Prompt Meter",
-  "description": "Per-prompt token + cost breakdown for Claude Code, with session dashboard. Thai/English.",
+  "description": "Per-prompt token & cost for Claude Code — live status-bar meter + dashboard with spend heatmap. Reads local logs only: no API key, no network. Thai/English.",
   "version": "0.4.1",
   "publisher": "ryukenshin546-a11y",
   "license": "MIT",
