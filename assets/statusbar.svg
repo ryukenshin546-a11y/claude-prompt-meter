@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 150" width="920" height="150" font-family="'Segoe UI',system-ui,sans-serif">
+  <rect width="920" height="150" rx="10" fill="#1e1e1e"/>
+
+  <!-- VS Code-style status bar strip with the warning (coral) meter segment -->
+  <rect x="0" y="96" width="920" height="34" fill="#252526"/>
+  <rect x="0" y="96" width="612" height="34" fill="#b0502f"/>
+
+  <!-- metrics inside the meter -->
+  <g fill="#fff" font-size="14" font-weight="600">
+    <text x="20"  y="118">↑ 1.0k</text>
+    <text x="118" y="118">↓ 54.7k</text>
+    <text x="232" y="118">▤ 101k</text>
+    <text x="338" y="118">⚒ 23</text>
+    <text x="416" y="118">◷ 99k</text>
+    <text x="520" y="118">$ 3.32</text>
+  </g>
+  <g fill="#bdbdbd" font-size="13">
+    <text x="640" y="118">⟵ click to open the dashboard</text>
+  </g>
+
+  <!-- callout labels with leader lines pointing at each metric -->
+  <g font-size="12.5" fill="#9b9b9b" text-anchor="middle">
+    <g stroke="#5a5a5a" stroke-width="1">
+      <line x1="40"  y1="92" x2="40"  y2="60"/>
+      <line x1="150" y1="92" x2="150" y2="36"/>
+      <line x1="262" y1="92" x2="262" y2="60"/>
+      <line x1="356" y1="92" x2="356" y2="36"/>
+      <line x1="446" y1="92" x2="446" y2="60"/>
+      <line x1="548" y1="92" x2="548" y2="36"/>
+    </g>
+    <text x="40"  y="50">input you sent</text>
+    <text x="150" y="26">output (AI + tools)</text>
+    <text x="262" y="50">context in use</text>
+    <text x="356" y="26">tool calls</text>
+    <text x="446" y="50">context left</text>
+    <text x="548" y="26" fill="#e0a48f" font-weight="600">this prompt's cost</text>
+  </g>
+</svg>

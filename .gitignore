@@ -1,0 +1,9 @@
+node_modules/
+*.vsix
+*.log
+.DS_Store
+.vscode-test/
+
+# scratch test artifacts
+test_watch_dir_tmp/
+test_watch_tmp.txt

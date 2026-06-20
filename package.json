@@ -1,0 +1,122 @@
+{
+  "name": "claude-prompt-meter",
+  "displayName": "Claude Prompt Meter",
+  "description": "Per-prompt token + cost breakdown for Claude Code, with session dashboard. Thai/English.",
+  "version": "0.4.1",
+  "publisher": "ryukenshin546-a11y",
+  "license": "MIT",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryukenshin546-a11y/claude-prompt-meter"
+  },
+  "bugs": {
+    "url": "https://github.com/ryukenshin546-a11y/claude-prompt-meter/issues"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "claude",
+    "anthropic",
+    "tokens",
+    "cost",
+    "usage",
+    "dashboard",
+    "prompt",
+    "billing",
+    "budget",
+    "thai"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "claudePromptMeter.openDashboard",
+        "title": "Open Dashboard",
+        "category": "Claude Prompt Meter"
+      },
+      {
+        "command": "claudePromptMeter.setBudget",
+        "title": "Set Daily Budget",
+        "category": "Claude Prompt Meter"
+      },
+      {
+        "command": "claudePromptMeter.reset",
+        "title": "Reset Counter",
+        "category": "Claude Prompt Meter"
+      },
+      {
+        "command": "claudePromptMeter.toggleLang",
+        "title": "Toggle Language (Thai / English)",
+        "category": "Claude Prompt Meter"
+      },
+      {
+        "command": "claudePromptMeter.refresh",
+        "title": "Refresh",
+        "category": "Claude Prompt Meter"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claudePromptMeter",
+          "title": "Claude Prompt Meter",
+          "icon": "sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "claudePromptMeter": [
+        {
+          "id": "claudePromptMeter.dashboardView",
+          "name": "Dashboard",
+          "type": "webview"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Claude Prompt Meter",
+      "properties": {
+        "claudePromptMeter.pricing.inputPerMillion": {
+          "type": "number",
+          "default": 3,
+          "description": "USD per 1M input tokens"
+        },
+        "claudePromptMeter.pricing.outputPerMillion": {
+          "type": "number",
+          "default": 15,
+          "description": "USD per 1M output tokens"
+        },
+        "claudePromptMeter.pricing.cacheReadPerMillion": {
+          "type": "number",
+          "default": 0.3,
+          "description": "USD per 1M cache-read tokens"
+        },
+        "claudePromptMeter.pricing.cacheCreatePerMillion": {
+          "type": "number",
+          "default": 3.75,
+          "description": "USD per 1M cache-write tokens"
+        },
+        "claudePromptMeter.budget.dailyUsd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "description": "Daily budget in USD; tooltip + dashboard show % used"
+        }
+      }
+    }
+  }
+}

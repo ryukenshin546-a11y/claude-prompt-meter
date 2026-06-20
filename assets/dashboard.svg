@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 470" width="920" height="470" font-family="'Segoe UI',system-ui,sans-serif">
+  <defs>
+    <pattern id="hm" width="15" height="15" patternUnits="userSpaceOnUse">
+      <rect width="12" height="12" rx="2" fill="#2c2c2c"/>
+    </pattern>
+  </defs>
+  <rect width="920" height="470" rx="10" fill="#1e1e1e"/>
+
+  <!-- header -->
+  <circle cx="34" cy="34" r="5" fill="#b0502f"/>
+  <text x="48" y="39" fill="#e6e6e6" font-size="17" font-weight="700">Claude Prompt Meter</text>
+  <rect x="250" y="22" width="160" height="24" rx="5" fill="#2d2d2d" stroke="#3a3a3a"/>
+  <text x="262" y="38" fill="#bdbdbd" font-size="12.5">Current session ▾</text>
+  <rect x="424" y="22" width="62" height="24" rx="5" fill="#b0502f"/>
+  <text x="436" y="38" fill="#fff" font-size="12.5">↻ Reset</text>
+
+  <!-- overview cards -->
+  <g>
+    <rect x="24"  y="62" width="282" height="80" rx="7" fill="#252526" stroke="#333"/>
+    <rect x="24"  y="62" width="3"  height="80" fill="#b0502f"/>
+    <text x="40" y="84"  fill="#8f8f8f" font-size="11" letter-spacing="0.5">TOTAL COST</text>
+    <text x="40" y="114" fill="#f1f1f1" font-size="24" font-weight="700">$154.80</text>
+    <text x="40" y="132" fill="#8f8f8f" font-size="12">44 prompts</text>
+
+    <rect x="320" y="62" width="282" height="80" rx="7" fill="#252526" stroke="#333"/>
+    <rect x="320" y="62" width="3"  height="80" fill="#b0502f"/>
+    <text x="336" y="84"  fill="#8f8f8f" font-size="11" letter-spacing="0.5">CONTEXT USED</text>
+    <text x="336" y="110" fill="#f1f1f1" font-size="22" font-weight="700">101k</text>
+    <rect x="336" y="118" width="250" height="7" rx="3" fill="#333"/>
+    <rect x="336" y="118" width="128" height="7" rx="3" fill="#b0502f"/>
+    <text x="336" y="138" fill="#8f8f8f" font-size="11">50.6% · 99k left</text>
+
+    <rect x="616" y="62" width="280" height="80" rx="7" fill="#252526" stroke="#333"/>
+    <rect x="616" y="62" width="3"  height="80" fill="#b0502f"/>
+    <text x="632" y="84"  fill="#8f8f8f" font-size="11" letter-spacing="0.5">TODAY'S BUDGET</text>
+    <text x="632" y="110" fill="#f1f1f1" font-size="20" font-weight="700">$8.42 <tspan fill="#8f8f8f" font-size="13" font-weight="400">/ $10</tspan></text>
+    <rect x="632" y="118" width="248" height="7" rx="3" fill="#333"/>
+    <rect x="632" y="118" width="209" height="7" rx="3" fill="#b0502f"/>
+    <text x="632" y="138" fill="#8f8f8f" font-size="11">84%</text>
+  </g>
+
+  <!-- heatmap (left) -->
+  <text x="24" y="178" fill="#9a9a9a" font-size="11.5" letter-spacing="0.5">DAILY USAGE <tspan fill="#6e6e6e">(Mar – Jun)</tspan></text>
+  <g font-size="9" fill="#7a7a7a">
+    <text x="58" y="196">Apr</text><text x="118" y="196">May</text><text x="178" y="196">Jun</text>
+  </g>
+  <g font-size="9" fill="#7a7a7a">
+    <text x="28" y="222">M</text><text x="28" y="252">W</text><text x="28" y="282">F</text>
+  </g>
+  <rect x="44" y="202" width="207" height="102" fill="url(#hm)"/>
+  <!-- a few "active" coral days -->
+  <g rx="2">
+    <rect x="194" y="217" width="12" height="12" rx="2" fill="#7a3115"/>
+    <rect x="194" y="247" width="12" height="12" rx="2" fill="#b0502f"/>
+    <rect x="209" y="232" width="12" height="12" rx="2" fill="#c46849"/>
+    <rect x="209" y="262" width="12" height="12" rx="2" fill="#b0502f" stroke="#d44" stroke-width="1.5"/>
+    <rect x="224" y="217" width="12" height="12" rx="2" fill="#8d3a1a"/>
+    <rect x="224" y="277" width="12" height="12" rx="2" fill="#b0502f"/>
+    <rect x="239" y="247" width="12" height="12" rx="2" fill="#d98a6f"/>
+  </g>
+  <g font-size="10" fill="#7a7a7a">
+    <text x="44" y="320">less</text>
+    <rect x="72" y="311" width="10" height="10" rx="2" fill="#2c2c2c"/>
+    <rect x="86" y="311" width="10" height="10" rx="2" fill="#7a3115"/>
+    <rect x="100" y="311" width="10" height="10" rx="2" fill="#b0502f"/>
+    <rect x="114" y="311" width="10" height="10" rx="2" fill="#d98a6f"/>
+    <text x="130" y="320">more · hover a day for its cost</text>
+  </g>
+
+  <!-- sparkline (right) -->
+  <text x="520" y="178" fill="#9a9a9a" font-size="11.5" letter-spacing="0.5">COST / PROMPT</text>
+  <rect x="512" y="190" width="384" height="118" rx="7" fill="#252526" stroke="#333"/>
+  <g>
+    <rect x="526" y="270" width="8" height="26" rx="1" fill="#cf8e79"/>
+    <rect x="542" y="262" width="8" height="34" rx="1" fill="#cf8e79"/>
+    <rect x="558" y="248" width="8" height="48" rx="1" fill="#cf8e79"/>
+    <rect x="574" y="214" width="8" height="82" rx="1" fill="#b0502f"/>
+    <rect x="590" y="256" width="8" height="40" rx="1" fill="#cf8e79"/>
+    <rect x="606" y="234" width="8" height="62" rx="1" fill="#b0502f"/>
+    <rect x="622" y="266" width="8" height="30" rx="1" fill="#cf8e79"/>
+    <rect x="638" y="208" width="8" height="88" rx="1" fill="#b0502f"/>
+    <rect x="654" y="276" width="8" height="20" rx="1" fill="#cf8e79"/>
+    <rect x="670" y="244" width="8" height="52" rx="1" fill="#cf8e79"/>
+    <rect x="686" y="226" width="8" height="70" rx="1" fill="#b0502f"/>
+    <rect x="702" y="272" width="8" height="24" rx="1" fill="#cf8e79"/>
+    <rect x="718" y="258" width="8" height="38" rx="1" fill="#cf8e79"/>
+    <rect x="734" y="220" width="8" height="76" rx="1" fill="#b0502f"/>
+    <rect x="750" y="268" width="8" height="28" rx="1" fill="#cf8e79"/>
+    <rect x="766" y="240" width="8" height="56" rx="1" fill="#cf8e79"/>
+    <rect x="782" y="202" width="8" height="94" rx="1" fill="#b0502f"/>
+    <rect x="798" y="264" width="8" height="32" rx="1" fill="#cf8e79"/>
+    <rect x="814" y="232" width="8" height="64" rx="1" fill="#b0502f"/>
+    <rect x="830" y="274" width="8" height="22" rx="1" fill="#cf8e79"/>
+    <rect x="846" y="250" width="8" height="46" rx="1" fill="#cf8e79"/>
+    <rect x="862" y="216" width="8" height="80" rx="1" fill="#b0502f"/>
+  </g>
+  <text x="512" y="322" fill="#6e6e6e" font-size="10">darker = above the session average · click a bar to jump to its row</text>
+
+  <!-- per-prompt table -->
+  <line x1="24" y1="352" x2="896" y2="352" stroke="#333"/>
+  <g font-size="11" fill="#8f8f8f" letter-spacing="0.3">
+    <text x="30"  y="346">#</text>
+    <text x="70"  y="346">MODEL</text>
+    <text x="470" y="346" text-anchor="end">IN</text>
+    <text x="580" y="346" text-anchor="end">OUT</text>
+    <text x="690" y="346" text-anchor="end">TOOLS</text>
+    <text x="800" y="346" text-anchor="end">CTX</text>
+    <text x="890" y="346" text-anchor="end">COST</text>
+  </g>
+  <g font-size="13" fill="#d6d6d6">
+    <!-- row -->
+    <text x="30" y="378">44</text>
+    <circle cx="74" cy="374" r="4" fill="#b0502f"/><text x="86" y="378">Opus 4.8</text>
+    <text x="470" y="378" text-anchor="end">1.0k</text><text x="580" y="378" text-anchor="end">54.7k</text>
+    <text x="690" y="378" text-anchor="end">23</text><text x="800" y="378" text-anchor="end">101k</text>
+    <text x="890" y="378" text-anchor="end" fill="#c46849" font-weight="600">$3.32</text>
+
+    <text x="30" y="406">43</text>
+    <circle cx="74" cy="402" r="4" fill="#4a78b0"/><text x="86" y="406">Sonnet 4.6</text>
+    <text x="470" y="406" text-anchor="end">0.4k</text><text x="580" y="406" text-anchor="end">8.1k</text>
+    <text x="690" y="406" text-anchor="end">6</text><text x="800" y="406" text-anchor="end">96k</text>
+    <text x="890" y="406" text-anchor="end" fill="#c46849" font-weight="600">$0.41</text>
+
+    <text x="30" y="434">42</text>
+    <circle cx="74" cy="430" r="4" fill="#b0502f"/><text x="86" y="434">Opus 4.8</text>
+    <text x="470" y="434" text-anchor="end">6.8k</text><text x="580" y="434" text-anchor="end">20.9k</text>
+    <text x="690" y="434" text-anchor="end">7</text><text x="800" y="434" text-anchor="end">93k</text>
+    <text x="890" y="434" text-anchor="end" fill="#c46849" font-weight="600">$2.52</text>
+  </g>
+</svg>
