@@ -5,12 +5,27 @@ on:
   pull_request:
 
 jobs:
+  # Run the test suite on all three OSes Claude Code runs on. Fixtures build
+  # paths with path.join, so each runner exercises its own separator — this is
+  # how we catch OS-specific path bugs (e.g. backslash) without owning a Mac.
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - run: node --test
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
       - run: npx --yes @vscode/vsce package --no-dependencies

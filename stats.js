@@ -17,6 +17,16 @@ const DEFAULT_PRICING = {
 
 const safe = (l) => { try { return JSON.parse(l); } catch { return null; } };
 
+const mtimeOf = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
+
+// The dashboard re-derives every session on each refresh (and refreshes often).
+// Skip the expensive read+JSON.parse for files unchanged since last time, keyed
+// by mtime + a pricing signature (so custom-rate edits invalidate). The active
+// session's file keeps changing, so it always re-parses — always fresh.
+// ponytail: no eviction; bounded by file count, not refresh count. LRU if it ever bites.
+const _subCache = new Map();   // agent file -> { m, sig, v }
+const _sessCache = new Map();  // main  file -> { sig, v }
+
 // Slash commands (/model, /clear, …) inject synthetic user lines wrapped in
 // <command-name>, <local-command-stdout>, etc. They aren't prompts the user typed.
 function isCommandMeta(c) {
@@ -44,8 +54,70 @@ function costOf(u, p) {
   );
 }
 
+// Sub-agents (Workflow/Agent tool) run as full sessions of their own, written
+// to <session-dir>/<id>/subagents/**/agent-*.jsonl — NOT into the main file,
+// which only logs the one spawning tool_use. Their tokens are billed and their
+// tool calls are real work, so we fold them back into the prompt that spawned
+// them (matched by timestamp). ctx/window stay main-only: each has its own window.
+function listAgentFiles(dir) {
+  let out = [];
+  let ents;
+  try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of ents) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...listAgentFiles(p));
+    else if (/^agent-.*\.jsonl$/.test(e.name)) out.push(p);
+  }
+  return out;
+}
+
+// One entry per sub-agent transcript: its start time + summed work/usage/cost.
+function subagentContribs(file, userPricing = DEFAULT_PRICING) {
+  const dir = path.join(path.dirname(file), path.basename(file, ".jsonl"), "subagents");
+  const sig = JSON.stringify(userPricing);
+  const out = [];
+  for (const af of listAgentFiles(dir)) {
+    const m = mtimeOf(af);
+    const hit = _subCache.get(af);
+    if (hit && hit.m === m && hit.sig === sig) { out.push(hit.v); continue; }
+    // wf_<runId> path segment links this transcript to its spawning tool_use.
+    const runId = af.split(/[\\/]/).find((seg) => seg.startsWith("wf_")) || null;
+    let lines;
+    try { lines = fs.readFileSync(af, "utf8").trim().split("\n"); } catch { continue; }
+    let ts = null, calls = 0, output = 0, freshIn = 0, cacheRead = 0, cacheWrite = 0, cost = 0;
+    for (const line of lines) {
+      const o = safe(line);
+      if (!o) continue;
+      if (!ts && o.timestamp) ts = o.timestamp;
+      const u = o.message?.usage;
+      if (u) {
+        const p = getPricingForModel(o.message?.model, userPricing);
+        output += u.output_tokens || 0;
+        freshIn += u.input_tokens || 0;
+        cacheRead += u.cache_read_input_tokens || 0;
+        cacheWrite += u.cache_creation_input_tokens || 0;
+        cost += costOf(u, p);
+      }
+      const c = o.message?.content;
+      if (Array.isArray(c)) for (const b of c) if (b.type === "tool_use") calls++;
+    }
+    const v = { ts, runId, calls, output, freshIn, cacheRead, cacheWrite, cost };
+    _subCache.set(af, { m, sig, v });
+    out.push(v);
+  }
+  return out;
+}
+
 // Walk one session file once, returning everything every view needs.
 function sessionStats(file, userPricing = DEFAULT_PRICING) {
+  // Cache key folds in the main file AND every sub-agent file's mtime: sub-agents
+  // append asynchronously, so the main mtime alone can't tell us they changed.
+  const subDir = path.join(path.dirname(file), path.basename(file, ".jsonl"), "subagents");
+  let sig = mtimeOf(file) + "|" + JSON.stringify(userPricing);
+  for (const af of listAgentFiles(subDir)) sig += "|" + af + ":" + mtimeOf(af);
+  const cached = _sessCache.get(file);
+  if (cached && cached.sig === sig) return cached.v;
+
   let lines;
   try { lines = fs.readFileSync(file, "utf8").trim().split("\n"); } catch { return null; }
 
@@ -53,6 +125,11 @@ function sessionStats(file, userPricing = DEFAULT_PRICING) {
   let cur = null;
   let sessionCost = 0, sessionOut = 0, sessionCacheRead = 0, sessionCacheWrite = 0, sessionFreshIn = 0;
   let is1m = false;             // 1M context window? from [1m] model tag or observed ctx
+
+  // Exact sub-agent attribution: link wf_<runId> -> the prompt that spawned it,
+  // via the spawning tool_use id and the RunId echoed in that tool's result.
+  const spawnPrompt = new Map(); // tool_use id (Workflow/Agent) -> prompt object
+  const runToTool = new Map();   // wf_<runId> -> that spawning tool_use id
 
   const pushCur = () => { if (cur) prompts.push(cur); };
 
@@ -90,11 +167,48 @@ function sessionStats(file, userPricing = DEFAULT_PRICING) {
       sessionCost += costOf(u, pricing);
     }
     const c = o.message?.content;
-    if (Array.isArray(c)) for (const b of c) if (b.type === "tool_use") cur.calls++;
+    if (Array.isArray(c)) for (const b of c) {
+      if (b.type === "tool_use") {
+        cur.calls++;
+        if (b.name === "Workflow" || b.name === "Agent") spawnPrompt.set(b.id, cur);
+      } else if (b.type === "tool_result" && spawnPrompt.has(b.tool_use_id)) {
+        // a spawn's own result echoes RunId: "wf_..." — bind it to that tool_use
+        const txt = typeof b.content === "string" ? b.content : JSON.stringify(b.content);
+        const m = txt.match(/wf_[a-z0-9-]+/gi);
+        if (m) for (const r of m) runToTool.set(r, b.tool_use_id);
+      }
+    }
   }
   pushCur();
 
   if (!prompts.length) return null;
+
+  // Fold each sub-agent's work into the prompt that spawned it. Prefer the exact
+  // runId link (immune to background agents finishing after later prompts); fall
+  // back to the [ts, nextTs) window only when the link isn't resolvable yet.
+  // calls/output/cost grow on that row and on session billing — but NOT ctx/window
+  // (separate context windows). `agents` marks how many sub-agents landed here.
+  for (const ct of subagentContribs(file, userPricing)) {
+    let target = ct.runId && runToTool.has(ct.runId) ? spawnPrompt.get(runToTool.get(ct.runId)) : null;
+    if (!target) {
+      const t = tsMs(ct.ts);
+      target = prompts[prompts.length - 1];
+      for (let i = 0; t && i < prompts.length; i++) {
+        const a = tsMs(prompts[i].ts);
+        const b = i + 1 < prompts.length ? tsMs(prompts[i + 1].ts) : Infinity;
+        if (t >= a && t < b) { target = prompts[i]; break; }
+      }
+    }
+    target.calls += ct.calls;
+    target.output += ct.output;
+    target.cost += ct.cost;
+    target.agents = (target.agents || 0) + 1;
+    sessionFreshIn += ct.freshIn;
+    sessionOut += ct.output;
+    sessionCacheRead += ct.cacheRead;
+    sessionCacheWrite += ct.cacheWrite;
+    sessionCost += ct.cost;
+  }
 
   // No-response prompts (interrupted/queued, $0) carry no model of their own —
   // inherit the session's current model so every row shows one. Mark it inherited.
@@ -106,7 +220,7 @@ function sessionStats(file, userPricing = DEFAULT_PRICING) {
 
   const last = prompts[prompts.length - 1];
   const window = is1m ? 1_000_000 : STD_WINDOW;
-  return {
+  const result = {
     last,
     prompts,
     session: {
@@ -121,6 +235,8 @@ function sessionStats(file, userPricing = DEFAULT_PRICING) {
       left: Math.max(0, window - last.ctx),
     },
   };
+  _sessCache.set(file, { sig, v: result });
+  return result;
 }
 
 function latestJsonl(dir) {
@@ -138,8 +254,8 @@ const tsMs = (t) => (t ? new Date(t).getTime() || 0 : 0);
 
 function allSessions(dir, markers = {}, userPricing = DEFAULT_PRICING) {
   // returns [{file, id, created, modified, promptCount, cost}] newest first.
-  // Parses the whole file: a 3MB session reads in a few ms, and the old
-  // last-50-lines preview reported wildly wrong cost/count for long sessions.
+  // Reuses (cached) sessionStats so it shares the per-file parse; prompt.cost
+  // already folds in sub-agent cost, so gating per prompt gates both.
   // markers: { sessionId: ms } — each session counts only prompts after ITS OWN
   // reset marker (sessions without a marker count everything).
   try {
@@ -149,22 +265,13 @@ function allSessions(dir, markers = {}, userPricing = DEFAULT_PRICING) {
         const p = path.join(dir, f);
         const id = path.basename(f, ".jsonl");
         const reset = markers[id] || 0;
-        const stat = fs.statSync(p);
-        let lines;
-        try { lines = fs.readFileSync(p, "utf8").trim().split("\n"); } catch { return null; }
+        let stat;
+        try { stat = fs.statSync(p); } catch { return null; }
 
-        // Gate BOTH count and cost on the reset marker (usage rows carry no
-        // timestamp, so track post-reset state per prompt instead of per line).
-        let promptCount = 0, cost = 0, counting = !reset;
-        for (const line of lines) {
-          const o = safe(line);
-          if (!o) continue;
-          if (isTyped(o)) {
-            counting = !reset || tsMs(o.timestamp) > reset;
-            if (counting) promptCount++;
-          }
-          const u = o.message?.usage;
-          if (u && counting) cost += costOf(u, getPricingForModel(o.message?.model, userPricing));
+        const s = sessionStats(p, userPricing);
+        let promptCount = 0, cost = 0;
+        if (s) for (const pr of s.prompts) {
+          if (!reset || tsMs(pr.ts) > reset) { promptCount++; cost += pr.cost; }
         }
 
         return {
@@ -251,4 +358,4 @@ function projectDir(root) {
   return path.join(os.homedir(), ".claude", "projects", slug);
 }
 
-module.exports = { sessionStats, latestJsonl, allSessions, costByDay, projectDir, findProjectDir, costOf, DEFAULT_PRICING, WINDOW, getPricingForModel, normalizeModelId };
+module.exports = { sessionStats, latestJsonl, allSessions, costByDay, projectDir, findProjectDir, sessionCwd, costOf, DEFAULT_PRICING, WINDOW, getPricingForModel, normalizeModelId };

@@ -2,6 +2,17 @@
 
 All notable changes to "Claude Prompt Meter" will be documented here.
 
+## [0.5.0] - 2026-06-21
+
+### Added
+- **Sub-agent token & cost accounting.** Work done by sub-agents (Workflow/Agent tool) is now folded into the prompt that spawned them — its tools count, output, and cost include the sub-agents' work, and a `⇲N` badge marks how many landed on that row. Previously a prompt that ran N agents showed only the spawn call, and the agents' (billed) tokens were invisible, undercounting session cost.
+- **Exact attribution via runId**, not timestamps — a background agent that finishes after you've typed later prompts still attributes to its real upline prompt.
+- **Diagnostics report** — a "Claude Prompt Meter" output channel plus a `Diagnostics (copy report)` command and a 🔍 button on the dashboard. Builds a local (no-network) report of platform/paths/parse status and copies it to the clipboard for bug reports.
+
+### Changed
+- Cross-platform CI: the test suite now runs on macOS, Windows, and Linux.
+- Per-file mtime cache so the dashboard doesn't re-parse unchanged sessions on every refresh.
+
 ## [0.4.1] - 2026-06-20
 
 ### Changed

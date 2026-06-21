@@ -104,6 +104,73 @@ test("costByDay buckets cost + prompts per local day across the file", () => {
   assert.equal(by["2026-06-21"].prompts, 1);
 });
 
+test("sub-agent transcripts fold into the spawning prompt's tools + cost", () => {
+  const dir = path.join(os.tmpdir(), `cpm-sub-${process.pid}`);
+  const id = "sess";
+  const sub = path.join(dir, id, "subagents", "workflows", "wf_x");
+  fs.mkdirSync(sub, { recursive: true });
+  // main: two prompts, the 2nd spawns a sub-agent (one Workflow tool_use)
+  fs.writeFileSync(path.join(dir, id + ".jsonl"), [
+    userLine("2026-06-20T10:00:00Z"), asstLine("claude-opus-4-8", { input_tokens: 1, output_tokens: 1 }),
+    userLine("2026-06-20T11:00:00Z"), asstLine("claude-opus-4-8", { input_tokens: 1, output_tokens: 1 }),
+  ].map((l) => JSON.stringify(l)).join("\n"));
+  // sub-agent runs at 11:05 → belongs to prompt #2; 3 tool_use, $5 opus input
+  fs.writeFileSync(path.join(sub, "agent-abc.jsonl"), [
+    { type: "user", timestamp: "2026-06-20T11:05:00Z", message: { content: "go" } },
+    { type: "assistant", message: { model: "claude-opus-4-8", usage: { input_tokens: 1_000_000, output_tokens: 0 },
+      content: [{ type: "tool_use", name: "Read" }, { type: "tool_use", name: "Bash" }, { type: "tool_use", name: "Edit" }] } },
+  ].map((l) => JSON.stringify(l)).join("\n"));
+
+  const s = sessionStats(path.join(dir, id + ".jsonl"));
+  assert.equal(s.prompts.length, 2);
+  assert.equal(s.prompts[0].calls, 1);                 // prompt #1 untouched
+  assert.equal(s.prompts[1].calls, 1 + 3);             // own tool + 3 sub-agent tools
+  assert.ok(Math.abs(s.prompts[1].cost - 5) < 0.01);   // ~$5 sub-agent cost lands here
+  assert.ok(Math.abs(s.session.cost - 5) < 0.01);      // and in the session total
+});
+
+test("background sub-agent attributes to its spawning prompt via runId, not timestamp", () => {
+  const dir = path.join(os.tmpdir(), `cpm-runid-${process.pid}`);
+  const id = "sess";
+  // realistic runId (digits + dash) — a naive path regex can miss this even
+  // when a simple name like "wf_real" would match, so use the gnarly form.
+  const runId = "wf_b92d04f3-d83";
+  const sub = path.join(dir, id, "subagents", "workflows", runId);
+  fs.mkdirSync(sub, { recursive: true });
+  // prompt #1 spawns a Workflow (toolu_W); its result echoes the RunId.
+  // prompt #2 comes later. The agent runs in the background and only logs at
+  // 11:30 — inside prompt #2's time window — so timestamp alone would misattribute.
+  fs.writeFileSync(path.join(dir, id + ".jsonl"), [
+    userLine("2026-06-20T10:00:00Z"),
+    { type: "assistant", message: { model: "claude-opus-4-8", usage: { input_tokens: 1, output_tokens: 1 },
+      content: [{ type: "tool_use", name: "Workflow", id: "toolu_W" }] } },
+    { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_W", content: `Started. RunId: "${runId}"` }] } },
+    userLine("2026-06-20T11:00:00Z"),
+    { type: "assistant", message: { model: "claude-opus-4-8", usage: { input_tokens: 1, output_tokens: 1 }, content: [] } },
+  ].map((l) => JSON.stringify(l)).join("\n"));
+  fs.writeFileSync(path.join(sub, "agent-1.jsonl"), [
+    { type: "user", timestamp: "2026-06-20T11:30:00Z", message: { content: "go" } },
+    { type: "assistant", message: { model: "claude-opus-4-8", usage: { input_tokens: 1_000_000, output_tokens: 0 },
+      content: [{ type: "tool_use", name: "Read" }, { type: "tool_use", name: "Bash" }] } },
+  ].map((l) => JSON.stringify(l)).join("\n"));
+
+  const s = sessionStats(path.join(dir, id + ".jsonl"));
+  assert.equal(s.prompts[0].agents, 1);              // marked: this row absorbed a sub-agent
+  assert.equal(s.prompts[0].calls, 1 + 2);           // spawner's own tool + 2 background-agent tools
+  assert.ok(Math.abs(s.prompts[0].cost - 5) < 0.01); // $5 lands on the SPAWNER (prompt #1)
+  assert.equal(s.prompts[1].agents, undefined);      // NOT prompt #2, despite the 11:30 timestamp
+  assert.equal(s.prompts[1].calls, 0);
+});
+
+test("per-file cache doesn't go stale when pricing changes", () => {
+  // unknown model → falls back to userPricing, so changing it must change cost
+  const f = fixture([userLine("2026-06-20T10:00:00Z"), asstLine("mystery-model-x", { input_tokens: 1_000_000, output_tokens: 0 })]);
+  const cheap = sessionStats(f, { inputPerMillion: 3, outputPerMillion: 0, cacheReadPerMillion: 0, cacheCreatePerMillion: 0 }).session.cost;
+  const dear = sessionStats(f, { inputPerMillion: 50, outputPerMillion: 0, cacheReadPerMillion: 0, cacheCreatePerMillion: 0 }).session.cost;
+  assert.ok(Math.abs(cheap - 3) < 0.01);
+  assert.ok(Math.abs(dear - 50) < 0.01);   // recomputed, not served from the $3 cache entry
+});
+
 test("allSessions counts each session only after its own reset marker", () => {
   const f = fixture([
     userLine("2026-06-20T10:00:00Z"), asstLine("claude-opus-4-8", { input_tokens: 1, output_tokens: 1 }),

@@ -1,0 +1,45 @@
+name: Publish
+
+# Push a version tag to release to BOTH marketplaces, e.g.:
+#   git tag v0.5.0 && git push origin v0.5.0
+# A plain push to main does NOT publish — only tags do.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   VSCE_PAT — Azure DevOps Personal Access Token for publisher ryukenshin546-a11y
+#   OVSX_PAT — Open VSX access token
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Guard: the tag must match package.json version, or we'd ship the wrong build.
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "Tag v$TAG != package.json $PKG"; exit 1
+          fi
+
+      - run: node --test
+
+      # Package once, publish the SAME artifact to both registries.
+      - run: npx --yes @vscode/vsce package --no-dependencies -o extension.vsix
+
+      - name: Publish to VS Code Marketplace
+        run: npx --yes @vscode/vsce publish --packagePath extension.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX
+        run: npx --yes ovsx publish extension.vsix -p "$OVSX_PAT"
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}

@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const crypto = require("crypto");
-const { sessionStats, latestJsonl, allSessions, costByDay, findProjectDir, DEFAULT_PRICING, WINDOW } = require("./stats.js");
+const { sessionStats, latestJsonl, allSessions, costByDay, findProjectDir, projectDir, sessionCwd, DEFAULT_PRICING, WINDOW } = require("./stats.js");
 const { renderDashboard } = require("./dashboard.js");
 
 const L = {
@@ -50,14 +50,64 @@ function activate(ctx) {
   bar.show();
   ctx.subscriptions.push(bar);
 
+  // Local diagnostics only — no network (a no-network meter shouldn't phone home).
+  // Users open this channel / run the Diagnostics command and paste it into a report.
+  const out = vscode.window.createOutputChannel("Claude Prompt Meter");
+  ctx.subscriptions.push(out);
+  const log = (msg) => out.appendLine(`[${new Date().toISOString()}] ${msg}`);
+
   // Resolve the session dir for whatever workspace is open — works on any machine.
   const resolveDir = () => {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     return root ? findProjectDir(root) : null;
   };
+
+  // One-shot report covering the usual "no data shows up" causes, esp. cross-OS
+  // path/slug mismatches: shows the resolved dir, and when it's null, the
+  // candidate dirs with the cwd each recorded so a mismatch is obvious.
+  const buildDiagnostics = () => {
+    const L = [];
+    const add = (k, v) => L.push(`${k}: ${v}`);
+    add("extension", "claude-prompt-meter v" + (ctx.extension?.packageJSON?.version || "?"));
+    add("platform", `${process.platform} ${process.arch}`);
+    add("node", process.version);
+    add("vscode", vscode.version);
+    add("homedir", os.homedir());
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || null;
+    add("workspace root", root || "(none open)");
+    const base = path.join(os.homedir(), ".claude", "projects");
+    add("projects root", `${base} (exists: ${fs.existsSync(base)})`);
+    const guess = root ? projectDir(root) : null;
+    if (guess) add("slug guess", `${path.basename(guess)} (exists: ${fs.existsSync(guess)})`);
+    const resolved = root ? findProjectDir(root) : null;
+    add("resolved dir", resolved ? `${resolved} (exists: ${fs.existsSync(resolved)})` : "(null — no project matched this workspace)");
+    if (resolved && fs.existsSync(resolved)) {
+      let files = [];
+      try { files = fs.readdirSync(resolved).filter((f) => f.endsWith(".jsonl")); } catch (e) { add("readdir error", e.message); }
+      add("session files", files.length);
+      const latest = latestJsonl(resolved);
+      if (latest) {
+        add("latest file", path.basename(latest));
+        try {
+          const s = sessionStats(latest, pricing());
+          add("parse latest", s ? `OK — ${s.prompts.length} prompts, $${s.session.cost.toFixed(2)}` : "null (no typed prompts found)");
+        } catch (e) { add("parse error", e.message + "\n" + (e.stack || "")); }
+      }
+    } else if (fs.existsSync(base)) {
+      add("hint", "no match — candidate project dirs and the cwd each recorded (compare to workspace root above):");
+      try {
+        for (const d of fs.readdirSync(base).slice(0, 20)) {
+          const lf = latestJsonl(path.join(base, d));
+          L.push(`  - ${d}  ←  cwd: ${(lf && sessionCwd(lf)) || "(none)"}`);
+        }
+      } catch (e) { add("scan error", e.message); }
+    }
+    return L.join("\n");
+  };
   ctx.globalState.update("resetTimestamp", undefined); // retire the pre-0.3.21 global reset key
 
   let dir = resolveDir();
+  log(`activated on ${process.platform}; resolved dir: ${dir || "(null)"}`);
   let liveStats = null;        // the newest session — what the status bar always shows
   let liveId = null;           // basename of the file liveStats was parsed from
   let stats = null;            // what the dashboard shows (selected session, or live)
@@ -148,6 +198,8 @@ function activate(ctx) {
       await ctx.globalState.update("lang", lang() === "th" ? "en" : "th"); render();
     } else if (msg.command === "setBudget") {
       vscode.commands.executeCommand("claudePromptMeter.setBudget"); // reuse the input-box flow
+    } else if (msg.command === "diagnostics") {
+      vscode.commands.executeCommand("claudePromptMeter.diagnostics");
     }
   };
 
@@ -193,7 +245,7 @@ function activate(ctx) {
     if (refreshTimer) return;
     refreshTimer = setTimeout(() => {
       refreshTimer = null;
-      try { refresh(); } catch (e) { console.error("claudePromptMeter refresh failed", e); }
+      try { refresh(); } catch (e) { log(`refresh failed: ${e.message}\n${e.stack || ""}`); }
     }, 150);
   };
 
@@ -229,6 +281,13 @@ function activate(ctx) {
       }
     }),
     vscode.commands.registerCommand("claudePromptMeter.refresh", refresh),
+    vscode.commands.registerCommand("claudePromptMeter.diagnostics", async () => {
+      const report = buildDiagnostics();
+      out.appendLine("\n===== DIAGNOSTICS =====\n" + report + "\n=======================");
+      out.show(true);
+      try { await vscode.env.clipboard.writeText(report); } catch {}
+      vscode.window.showInformationMessage("Claude Prompt Meter: diagnostics copied to clipboard — paste it into your bug report.");
+    }),
     vscode.commands.registerCommand("claudePromptMeter.openDashboard", () => {
       if (panel) { panel.reveal(); return; }
       panel = vscode.window.createWebviewPanel(

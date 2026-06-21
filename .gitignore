@@ -7,3 +7,10 @@ node_modules/
 # scratch test artifacts
 test_watch_dir_tmp/
 test_watch_tmp.txt
+
+# dev/promo artifacts (kept locally, never committed/packaged)
+.playwright-mcp/
+awesome-form.png
+claudeai-ready.png
+hn-ready.png
+hn-ready2.png

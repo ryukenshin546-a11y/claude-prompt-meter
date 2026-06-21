@@ -24,3 +24,10 @@ test-*.js
 !CHANGELOG.md
 !LICENSE
 !icon.png
+
+# dev/promo junk that must never ship in the package (placed last so it wins over !*.js)
+.playwright-mcp/
+awesome-form.png
+claudeai-ready.png
+hn-ready.png
+hn-ready2.png

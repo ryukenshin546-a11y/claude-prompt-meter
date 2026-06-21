@@ -10,6 +10,8 @@ const T = {
         budget: "งบประมาณวันนี้", noBudget: "ยังไม่ตั้งงบ — คลิกเพื่อกำหนด", budgetEdit: "คลิกเพื่อตั้งงบประมาณ",
         selectSession: "เลือก Session", currentSession: "Session ปัจจุบัน", reset: "รีเซ็ต",
         resetHint: "รีเซ็ต counter (ไม่ลบข้อมูลจริง)", help: "คู่มือ", langSwitch: "EN",
+        diag: "วินิจฉัย", diagHint: "สร้างรายงานวินิจฉัย + คัดลอก (ส่งให้ผู้พัฒนาเวลามีปัญหา)",
+        agentsTip: "รวมงาน sub-agent %n ตัว (อัปเดตจาก agent ที่ทำงานเบื้องหลัง)",
         helpContent: {
           title: "คู่มือการใช้งาน",
           cost: "ค่าใช้จ่าย", costDesc: "คำนวณจาก input + output + cache ตาม pricing ที่ตั้งไว้",
@@ -30,6 +32,8 @@ const T = {
         budget: "Today's budget", noBudget: "no budget set — click to set", budgetEdit: "Click to set budget",
         selectSession: "Select Session", currentSession: "Current session", reset: "Reset",
         resetHint: "Reset counter (won't delete data)", help: "Help", langSwitch: "TH",
+        diag: "Diagnostics", diagHint: "Build a diagnostics report + copy it (send to the developer when something's wrong)",
+        agentsTip: "includes %n sub-agent(s) (updated from background agents)",
         helpContent: {
           title: "User Guide",
           cost: "Cost", costDesc: "Calculated from input + output + cache with configured pricing",
@@ -81,7 +85,7 @@ function renderDashboard(stats, { lang = "th", budget = null, usd, sessions = []
       <td>${badge(p)}</td>
       <td>${k(p.input)}</td>
       <td>${k(p.output)}</td>
-      <td>${p.calls}</td>
+      <td>${p.calls}${p.agents ? ` <span class="agbadge" title="${t.agentsTip.replace("%n", p.agents)}">⇲${p.agents}</span>` : ""}</td>
       <td>${k(p.ctx)}</td>
       <td class="cost">${usd(p.cost)}</td>
     </tr>`;
@@ -218,6 +222,8 @@ function renderDashboard(stats, { lang = "th", budget = null, usd, sessions = []
     th:nth-child(2),td:nth-child(2) { text-align:left; }
     th { font-weight:600; opacity:.7; font-size:11px; text-transform:uppercase; }
     td.cost { color:var(--coral-soft); font-weight:600; }
+    .agbadge { display:inline-block; margin-left:4px; padding:0 5px; border-radius:8px; font-size:10px; font-weight:600;
+               color:var(--coral-soft); background:rgba(176,80,47,.16); cursor:help; }
     .badge { display:inline-flex; align-items:center; gap:6px; font-size:12px; white-space:nowrap; }
     .badge.inherited { opacity:.5; }
     .mdot { width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
@@ -275,6 +281,7 @@ function renderDashboard(stats, { lang = "th", budget = null, usd, sessions = []
       <button id="resetBtn" title="${t.resetHint}">↻ ${t.reset}</button>
       <button id="langBtn" class="secondary">${t.langSwitch}</button>
       <button id="helpBtn" class="secondary">? ${t.help}</button>
+      <button id="diagBtn" class="secondary" title="${t.diagHint}">🔍 ${t.diag}</button>
       ${resetNote}
     </div>
     <h2>${t.session}</h2>
@@ -341,6 +348,10 @@ function renderDashboard(stats, { lang = "th", budget = null, usd, sessions = []
 
       langBtn.addEventListener('click', () => {
         vscode.postMessage({ command: 'toggleLang' });
+      });
+
+      document.getElementById('diagBtn').addEventListener('click', () => {
+        vscode.postMessage({ command: 'diagnostics' });
       });
 
       helpBtn.addEventListener('click', () => {
