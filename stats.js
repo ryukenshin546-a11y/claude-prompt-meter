@@ -17,7 +17,9 @@ const DEFAULT_PRICING = {
 
 const safe = (l) => { try { return JSON.parse(l); } catch { return null; } };
 
-const mtimeOf = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
+// mtime AND size: a file rewritten within one mtime tick (coarse on Windows)
+// changes size when its content changes, so the cache can't serve stale data.
+const fileSig = (f) => { try { const s = fs.statSync(f); return s.mtimeMs + ":" + s.size; } catch { return "0"; } };
 
 // The dashboard re-derives every session on each refresh (and refreshes often).
 // Skip the expensive read+JSON.parse for files unchanged since last time, keyed
@@ -77,7 +79,7 @@ function subagentContribs(file, userPricing = DEFAULT_PRICING) {
   const sig = JSON.stringify(userPricing);
   const out = [];
   for (const af of listAgentFiles(dir)) {
-    const m = mtimeOf(af);
+    const m = fileSig(af);
     const hit = _subCache.get(af);
     if (hit && hit.m === m && hit.sig === sig) { out.push(hit.v); continue; }
     // wf_<runId> path segment links this transcript to its spawning tool_use.
@@ -113,8 +115,8 @@ function sessionStats(file, userPricing = DEFAULT_PRICING) {
   // Cache key folds in the main file AND every sub-agent file's mtime: sub-agents
   // append asynchronously, so the main mtime alone can't tell us they changed.
   const subDir = path.join(path.dirname(file), path.basename(file, ".jsonl"), "subagents");
-  let sig = mtimeOf(file) + "|" + JSON.stringify(userPricing);
-  for (const af of listAgentFiles(subDir)) sig += "|" + af + ":" + mtimeOf(af);
+  let sig = fileSig(file) + "|" + JSON.stringify(userPricing);
+  for (const af of listAgentFiles(subDir)) sig += "|" + af + ":" + fileSig(af);
   const cached = _sessCache.get(file);
   if (cached && cached.sig === sig) return cached.v;
 

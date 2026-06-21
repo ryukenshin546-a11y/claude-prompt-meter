@@ -8,8 +8,11 @@ const { sessionStats, allSessions, costByDay } = require("../stats.js");
 const { modelLabel, normalizeModelId, getPricingForModel, MODEL_PRICING } = require("../pricing.js");
 
 // Build a fake session file from JSONL lines and return its path.
+// Unique name per call: two fixtures must never share a path, or the parse
+// cache (keyed by path) could serve one's result for the other.
+let _fxN = 0;
 function fixture(lines) {
-  const p = path.join(os.tmpdir(), `cpm-test-${process.pid}-${lines.length}.jsonl`);
+  const p = path.join(os.tmpdir(), `cpm-test-${process.pid}-${_fxN++}.jsonl`);
   fs.writeFileSync(p, lines.map((l) => JSON.stringify(l)).join("\n"));
   return p;
 }
@@ -160,6 +163,16 @@ test("background sub-agent attributes to its spawning prompt via runId, not time
   assert.ok(Math.abs(s.prompts[0].cost - 5) < 0.01); // $5 lands on the SPAWNER (prompt #1)
   assert.equal(s.prompts[1].agents, undefined);      // NOT prompt #2, despite the 11:30 timestamp
   assert.equal(s.prompts[1].calls, 0);
+});
+
+test("cache invalidates when a path is rewritten with different content (same mtime tick)", () => {
+  // Reproduces the original Windows flake: rewrite the SAME path back-to-back.
+  // mtime resolution is coarse, so the cache must also key on file SIZE.
+  const p = path.join(os.tmpdir(), `cpm-rewrite-${process.pid}.jsonl`);
+  fs.writeFileSync(p, [userLine("2026-06-20T10:00:00Z"), asstLine("claude-opus-4-8", { input_tokens: 1000, output_tokens: 5 })].map((l) => JSON.stringify(l)).join("\n"));
+  assert.equal(sessionStats(p).session.window, 200_000);                 // small ctx → 200k
+  fs.writeFileSync(p, [userLine("2026-06-20T10:00:00Z"), asstLine("claude-opus-4-8", { cache_read_input_tokens: 250_000, output_tokens: 5 })].map((l) => JSON.stringify(l)).join("\n"));
+  assert.equal(sessionStats(p).session.window, 1_000_000);               // big ctx → 1M, not stale 200k
 });
 
 test("per-file cache doesn't go stale when pricing changes", () => {
