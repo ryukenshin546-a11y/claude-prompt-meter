@@ -17,9 +17,9 @@
 [![Rating](https://img.shields.io/visual-studio-marketplace/r/ryukenshin546-a11y.claude-prompt-meter)](https://marketplace.visualstudio.com/items?itemName=ryukenshin546-a11y.claude-prompt-meter&ssr=false#review-details)
 [![Open VSX](https://img.shields.io/open-vsx/v/ryukenshin546-a11y/claude-prompt-meter?label=Open%20VSX&color=8a5cb0)](https://open-vsx.org/extension/ryukenshin546-a11y/claude-prompt-meter)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Platforms](https://img.shields.io/badge/platforms-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-43853d.svg)](#-ความต้องการและแพลตฟอร์ม)
-[![Telemetry](https://img.shields.io/badge/telemetry-none-brightgreen.svg)](#-ความเป็นส่วนตัว)
-[![UI: Thai · English](https://img.shields.io/badge/UI-Thai%20%C2%B7%20English-8a5cb0.svg)](#-การใช้งาน)
+[![Platforms](https://img.shields.io/badge/platforms-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-43853d.svg)](README.md#-requirements--platform-support)
+[![Telemetry](https://img.shields.io/badge/telemetry-none-brightgreen.svg)](README.md#-privacy)
+[![UI: Thai · English](https://img.shields.io/badge/UI-Thai%20%C2%B7%20English-8a5cb0.svg)](README.md#-usage)
 
 <br/>
 
@@ -28,23 +28,6 @@
 <sub>status bar อัปเดตสดขณะ Claude Code ทำงาน คลิกเพื่อเปิดแดชบอร์ด</sub>
 
 </div>
-
----
-
-## 📑 สารบัญ
-
-- [นี่คืออะไร](#-นี่คืออะไร)
-- [ฟีเจอร์](#-ฟีเจอร์)
-- [การติดตั้ง](#-การติดตั้ง)
-- [การใช้งาน](#-การใช้งาน)
-- [ทำงานยังไง](#-ทำงานยังไง)
-- [ราคาและโมเดล](#-ราคาและโมเดล)
-- [การตั้งค่า](#-การตั้งค่า)
-- [การรีเซ็ตทำงานยังไง](#-การรีเซ็ตทำงานยังไง)
-- [ความเป็นส่วนตัว](#-ความเป็นส่วนตัว)
-- [ความต้องการและแพลตฟอร์ม](#-ความต้องการและแพลตฟอร์ม)
-- [คำถามที่พบบ่อย](#-คำถามที่พบบ่อย)
-- [สัญญาอนุญาต](#-สัญญาอนุญาต)
 
 ---
 
@@ -117,7 +100,7 @@ code --install-extension claude-prompt-meter-*.vsix
 |---|---|
 | **Open Dashboard** | เปิดแดชบอร์ดเต็มในตัว editor (หรือคลิกมิเตอร์บน status bar / ไอคอนเกจที่ Activity Bar) |
 | **Set Daily Budget** | ใส่จำนวนเงิน USD (เว้นว่างเพื่อลบ) คลิกการ์ดงบก็ได้ |
-| **Reset Counter** | เริ่มนับ session นี้ตั้งแต่ตอนนี้ (ดู [การรีเซ็ตทำงานยังไง](#-การรีเซ็ตทำงานยังไง)) |
+| **Reset Counter** | เริ่มนับ session นี้ตั้งแต่ตอนนี้ (ดูหัวข้อ “การรีเซ็ตทำงานยังไง” ด้านล่าง) |
 | **Toggle Language (Thai / English)** | สลับภาษา UI ทันที |
 | **Refresh** | อ่าน log ใหม่ (แทบไม่ต้องใช้ — มันอัปเดตเอง) |
 
