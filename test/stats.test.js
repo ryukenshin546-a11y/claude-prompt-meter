@@ -175,6 +175,25 @@ test("cache invalidates when a path is rewritten with different content (same mt
   assert.equal(sessionStats(p).session.window, 1_000_000);               // big ctx → 1M, not stale 200k
 });
 
+test("cache writes are priced by TTL: 1-hour at 2x input, 5-min at 1.25x", () => {
+  const f = fixture([
+    userLine("2026-06-20T10:00:00Z"),
+    { type: "assistant", message: { model: "claude-opus-4-8", content: [], usage: {
+      input_tokens: 0, output_tokens: 0,
+      cache_creation: { ephemeral_5m_input_tokens: 1_000_000, ephemeral_1h_input_tokens: 1_000_000 },
+    } } },
+  ]);
+  // opus input $5/M → 5-min write 1.25x = $6.25, 1-hour write 2x = $10 → $16.25
+  assert.ok(Math.abs(sessionStats(f).session.cost - 16.25) < 0.001);
+
+  // older logs without the split fall back to the flat field at 1.25x
+  const old = fixture([
+    userLine("2026-06-20T10:00:00Z"),
+    { type: "assistant", message: { model: "claude-opus-4-8", content: [], usage: { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 1_000_000 } } },
+  ]);
+  assert.ok(Math.abs(sessionStats(old).session.cost - 6.25) < 0.001);
+});
+
 test("per-file cache doesn't go stale when pricing changes", () => {
   // unknown model → falls back to userPricing, so changing it must change cost
   const f = fixture([userLine("2026-06-20T10:00:00Z"), asstLine("mystery-model-x", { input_tokens: 1_000_000, output_tokens: 0 })]);

@@ -2,6 +2,11 @@
 
 All notable changes to "Claude Prompt Meter" will be documented here.
 
+## [0.6.1] - 2026-06-21
+
+### Fixed
+- **Cache-write cost was undercounted (~35% of the cache-write line).** Cache writes are billed by TTL — 5-minute at 1.25× input, **1-hour at 2× input** — but every write was priced at 1.25×. Claude Code uses 1-hour caching heavily, so this materially understated cost. Now reads the `cache_creation` split (`ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`) and prices each correctly; falls back to the flat field at 1.25× for older logs. (Cache *reads* were always correct at 0.1×.)
+
 ## [0.6.0] - 2026-06-21
 
 ### Added

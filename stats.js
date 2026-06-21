@@ -47,13 +47,21 @@ function isTyped(o) {
 }
 
 function costOf(u, p) {
+  // Cache writes are billed by TTL: 5-min = 1.25x input (cacheCreatePerMillion),
+  // 1-hour = 2x input. Recent usage blocks split cache_creation into
+  // {ephemeral_5m_input_tokens, ephemeral_1h_input_tokens}; use that when present
+  // (Claude Code uses 1h heavily — flat 1.25x undercounts by ~35%). Fall back to
+  // the flat cache_creation_input_tokens at 1.25x for older logs without the split.
+  const cc = u.cache_creation;
+  const cacheWrite = (cc && typeof cc === "object")
+    ? (cc.ephemeral_5m_input_tokens || 0) * p.cacheCreatePerMillion + (cc.ephemeral_1h_input_tokens || 0) * p.inputPerMillion * 2
+    : (u.cache_creation_input_tokens || 0) * p.cacheCreatePerMillion;
   return (
-    ((u.input_tokens || 0) * p.inputPerMillion +
-      (u.output_tokens || 0) * p.outputPerMillion +
-      (u.cache_read_input_tokens || 0) * p.cacheReadPerMillion +
-      (u.cache_creation_input_tokens || 0) * p.cacheCreatePerMillion) /
-    1_000_000
-  );
+    (u.input_tokens || 0) * p.inputPerMillion +
+    (u.output_tokens || 0) * p.outputPerMillion +
+    (u.cache_read_input_tokens || 0) * p.cacheReadPerMillion +
+    cacheWrite
+  ) / 1_000_000;
 }
 
 // Sub-agents (Workflow/Agent tool) run as full sessions of their own, written
