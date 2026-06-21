@@ -14,6 +14,11 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Map secrets to job-level env so each publish step can self-skip when its
+    # token isn't set — having only one token still publishes that one registry.
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,11 +40,9 @@ jobs:
       - run: npx --yes @vscode/vsce package --no-dependencies -o extension.vsix
 
       - name: Publish to VS Code Marketplace
+        if: env.VSCE_PAT != ''
         run: npx --yes @vscode/vsce publish --packagePath extension.vsix
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
       - name: Publish to Open VSX
+        if: env.OVSX_PAT != ''
         run: npx --yes ovsx publish extension.vsix -p "$OVSX_PAT"
-        env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
