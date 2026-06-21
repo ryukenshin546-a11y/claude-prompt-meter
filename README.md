@@ -6,6 +6,8 @@
 
 ### See exactly what **every Claude Code prompt costs** — right in your status bar.
 
+**English** · [ไทย](README.th.md)
+
 Per‑prompt token & cost breakdown, a session dashboard with a one‑year spend heatmap,
 automatic per‑model pricing, daily budgets, and a bilingual **Thai / English** UI.
 All from Claude Code's own local logs — **no API key, no network, no telemetry.**
