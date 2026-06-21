@@ -330,12 +330,11 @@ function activate(ctx) {
     vscode.commands.registerCommand("claudePromptMeter.openDashboard", () => {
       if (panel) { panel.reveal(); return; }
       panel = vscode.window.createWebviewPanel(
-        "claudePromptMeter", "Claude Prompt Meter", vscode.ViewColumn.Active, { enableScripts: true, localResourceRoots: [] }
+        "claudePromptMeter", "Claude Prompt Meter", vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [] }
       );
       panel.webview.onDidReceiveMessage(onWebviewMsg);
       panel.onDidDispose(() => { panel = null; });
-      sessions = dir && fs.existsSync(dir) ? allSessions(dir, resetMarkers(), pricing()) : [];
-      panel.webview.html = dashHtml();
+      refresh(); // re-read data and render into the new panel (avoids a first-open blank when stats is stale)
     }),
     vscode.window.registerWebviewViewProvider("claudePromptMeter.dashboardView", {
       resolveWebviewView(wv) {
@@ -343,7 +342,7 @@ function activate(ctx) {
         wv.webview.options = { enableScripts: true, localResourceRoots: [] };
         wv.webview.onDidReceiveMessage(onWebviewMsg);
         wv.onDidDispose(() => { view = null; });
-        wv.webview.html = dashHtml();
+        refresh(); // populate + render into the freshly-resolved view (avoids a first-open blank)
       }
     })
   );

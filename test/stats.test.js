@@ -5,7 +5,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { sessionStats, allSessions, costByDay, ctxWarnState } = require("../stats.js");
-const { modelLabel, normalizeModelId, getPricingForModel, MODEL_PRICING } = require("../pricing.js");
+const { modelLabel, normalizeModelId, getPricingForModel, MODEL_PRICING, modelWindow } = require("../pricing.js");
 
 // Build a fake session file from JSONL lines and return its path.
 // Unique name per call: two fixtures must never share a path, or the parse
@@ -34,11 +34,18 @@ test("groups roundtrips per prompt; input=first roundtrip, output=summed", () =>
   assert.equal(s.last.calls, 2);          // two tool_use blocks
 });
 
-test("window is 200k by default, 1M once ctx exceeds 200k", () => {
-  const small = sessionStats(fixture([userLine("2026-06-20T10:00:00Z"), asstLine("claude-opus-4-8", { input_tokens: 1000, output_tokens: 5 })]));
-  assert.equal(small.session.window, 200_000);
+test("window is 1M for Opus/Sonnet 4.x by default (no [1m] tag), 200k for Haiku", () => {
+  // Opus 4.x ships a 1M window by default — small ctx, no [1m] tag, still 1M.
+  const opus = sessionStats(fixture([userLine("2026-06-20T10:00:00Z"), asstLine("claude-opus-4-8", { input_tokens: 1000, output_tokens: 5 })]));
+  assert.equal(opus.session.window, 1_000_000);
+  assert.equal(opus.session.left, 999_000);
 
-  const big = sessionStats(fixture([userLine("2026-06-20T10:00:00Z"), asstLine("claude-opus-4-8", { cache_read_input_tokens: 250_000, output_tokens: 5 })]));
+  // Haiku is a 200k model.
+  const haiku = sessionStats(fixture([userLine("2026-06-20T10:00:00Z"), asstLine("claude-haiku-4-5", { input_tokens: 1000, output_tokens: 5 })]));
+  assert.equal(haiku.session.window, 200_000);
+
+  // Observed ctx over 200k still forces 1M even for an unknown/200k model.
+  const big = sessionStats(fixture([userLine("2026-06-20T10:00:00Z"), asstLine("mystery-model", { cache_read_input_tokens: 250_000, output_tokens: 5 })]));
   assert.equal(big.session.window, 1_000_000);
   assert.equal(big.session.left, 750_000);
 });
@@ -169,9 +176,9 @@ test("cache invalidates when a path is rewritten with different content (same mt
   // Reproduces the original Windows flake: rewrite the SAME path back-to-back.
   // mtime resolution is coarse, so the cache must also key on file SIZE.
   const p = path.join(os.tmpdir(), `cpm-rewrite-${process.pid}.jsonl`);
-  fs.writeFileSync(p, [userLine("2026-06-20T10:00:00Z"), asstLine("claude-opus-4-8", { input_tokens: 1000, output_tokens: 5 })].map((l) => JSON.stringify(l)).join("\n"));
-  assert.equal(sessionStats(p).session.window, 200_000);                 // small ctx → 200k
-  fs.writeFileSync(p, [userLine("2026-06-20T10:00:00Z"), asstLine("claude-opus-4-8", { cache_read_input_tokens: 250_000, output_tokens: 5 })].map((l) => JSON.stringify(l)).join("\n"));
+  fs.writeFileSync(p, [userLine("2026-06-20T10:00:00Z"), asstLine("claude-haiku-4-5", { input_tokens: 1000, output_tokens: 5 })].map((l) => JSON.stringify(l)).join("\n"));
+  assert.equal(sessionStats(p).session.window, 200_000);                 // haiku small ctx → 200k
+  fs.writeFileSync(p, [userLine("2026-06-20T10:00:00Z"), asstLine("claude-haiku-4-5", { cache_read_input_tokens: 250_000, output_tokens: 5 })].map((l) => JSON.stringify(l)).join("\n"));
   assert.equal(sessionStats(p).session.window, 1_000_000);               // big ctx → 1M, not stale 200k
 });
 
@@ -201,6 +208,16 @@ test("per-file cache doesn't go stale when pricing changes", () => {
   const dear = sessionStats(f, { inputPerMillion: 50, outputPerMillion: 0, cacheReadPerMillion: 0, cacheCreatePerMillion: 0 }).session.cost;
   assert.ok(Math.abs(cheap - 3) < 0.01);
   assert.ok(Math.abs(dear - 50) < 0.01);   // recomputed, not served from the $3 cache entry
+});
+
+test("modelWindow: Opus/Sonnet 4.x + Fable/Mythos 5 = 1M, Haiku/3.x = 200k", () => {
+  assert.equal(modelWindow("claude-opus-4-8"), 1_000_000);
+  assert.equal(modelWindow("claude-opus-4-8[1m]"), 1_000_000); // tag stripped, still 1M
+  assert.equal(modelWindow("claude-sonnet-4-6"), 1_000_000);
+  assert.equal(modelWindow("claude-fable-5"), 1_000_000);
+  assert.equal(modelWindow("claude-haiku-4-5"), 200_000);
+  assert.equal(modelWindow("claude-3-opus"), 200_000);
+  assert.equal(modelWindow("mystery-model"), 200_000); // unknown → safe 200k default
 });
 
 test("ctxWarnState fires once per climb past the threshold, re-arms after a drop", () => {

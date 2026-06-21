@@ -2,6 +2,12 @@
 
 All notable changes to "Claude Prompt Meter" will be documented here.
 
+## [0.6.2] - 2026-06-21
+
+### Fixed
+- **Context window under-reported on 1M models.** Opus 4.x, Sonnet 4.x, and Fable/Mythos 5 have a 1M context window **by default** — Claude Code doesn't always tag the model `[1m]`, so the meter assumed 200k until observed context crossed it, wrongly showing ~22% full and a near-empty "left" early in a session. The window is now resolved from the model itself (Haiku and legacy 3.x stay 200k; observed overflow still forces 1M as a safety net). Verified against the Anthropic model docs — Opus 4.8's 1M is standard-priced with no >200k premium, so cost is unaffected.
+- **Dashboard could open blank on first open.** Opening the dashboard (editor panel or sidebar) now re-reads the logs and renders immediately, instead of showing a stale/empty view until it was closed and reopened. The editor panel also retains its content when hidden.
+
 ## [0.6.1] - 2026-06-21
 
 ### Fixed

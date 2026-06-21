@@ -55,6 +55,15 @@ function modelColor(id) {
   return { opus: "#b0502f", sonnet: "#4a78b0", haiku: "#4a9b6e", fable: "#8a5cb0", mythos: "#8a5cb0" }[fam] || "#888";
 }
 
+// Native context window for a model. Opus 4.x, Sonnet 4.x, and Fable/Mythos 5
+// ship a 1M window *by default* — no `[1m]` beta tag required (Claude Code often
+// omits the tag even when 1M is active). Haiku and legacy 3.x are 200k.
+// Verified against the Anthropic model docs (claude-api skill), 2026-06.
+function modelWindow(model) {
+  const id = normalizeModelId(model) || "";
+  return /^claude-(opus-4|sonnet-4|fable-5|mythos-5)/.test(id) ? 1_000_000 : 200_000;
+}
+
 function getPricingForModel(model, fallback) {
   const normalized = normalizeModelId(model);
   if (normalized && MODEL_PRICING[normalized]) {
@@ -68,4 +77,4 @@ function getPricingForModel(model, fallback) {
   return fallback;
 }
 
-module.exports = { MODEL_PRICING, normalizeModelId, getPricingForModel, modelLabel, modelColor };
+module.exports = { MODEL_PRICING, normalizeModelId, getPricingForModel, modelLabel, modelColor, modelWindow };

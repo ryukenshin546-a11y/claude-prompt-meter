@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { getPricingForModel, normalizeModelId } = require("./pricing.js");
+const { getPricingForModel, normalizeModelId, modelWindow } = require("./pricing.js");
 
 const WINDOW = 1_000_000; // legacy fallback export; real window resolved per-session
 const STD_WINDOW = 200_000;
@@ -160,7 +160,10 @@ function sessionStats(file, userPricing = DEFAULT_PRICING) {
       const pricing = getPricingForModel(model, userPricing);
       if (model && !cur.model) cur.model = normalizeModelId(model);
 
-      if (model && /\[1m\]/.test(model)) is1m = true;
+      // 1M window if the model natively supports it (default for Opus/Sonnet 4.x,
+      // Fable/Mythos 5), or the legacy [1m] tag is present. Don't wait for ctx to
+      // exceed 200k — that under-reported headroom on untagged 1M sessions.
+      if (model && (/\[1m\]/.test(model) || modelWindow(model) > STD_WINDOW)) is1m = true;
       cur.roundtrips++;
       if (cur.roundtrips === 1)
         cur.input = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0);

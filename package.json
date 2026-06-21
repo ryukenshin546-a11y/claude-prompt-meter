@@ -2,7 +2,7 @@
   "name": "claude-prompt-meter",
   "displayName": "Claude Prompt Meter",
   "description": "Per-prompt token & cost for Claude Code — live status-bar meter + dashboard with spend heatmap. Reads local logs only: no API key, no network. Thai/English.",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "publisher": "ryukenshin546-a11y",
   "license": "MIT",
   "icon": "icon.png",
