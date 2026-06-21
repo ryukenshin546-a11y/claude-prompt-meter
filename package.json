@@ -17,15 +17,22 @@
     "vscode": "^1.95.0"
   },
   "categories": [
-    "Other",
-    "Visualization"
+    "AI",
+    "Visualization",
+    "Other"
   ],
   "keywords": [
     "claude",
+    "claude code",
     "anthropic",
+    "llm",
+    "ai",
     "tokens",
+    "token counter",
     "cost",
+    "cost tracking",
     "usage",
+    "context",
     "dashboard",
     "prompt",
     "billing",

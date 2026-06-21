@@ -10,12 +10,14 @@ Per‑prompt token & cost breakdown, a session dashboard with a one‑year spend
 automatic per‑model pricing, daily budgets, and a bilingual **Thai / English** UI.
 All from Claude Code's own local logs — **no API key, no network, no telemetry.**
 
-[![Version](https://img.shields.io/badge/version-0.4.0-b0502f.svg)](CHANGELOG.md)
-[![VS Code](https://img.shields.io/badge/VS%20Code-%E2%89%A5%201.95-007ACC.svg?logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com)
+[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/ryukenshin546-a11y.claude-prompt-meter?label=VS%20Marketplace&color=b0502f&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=ryukenshin546-a11y.claude-prompt-meter)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/ryukenshin546-a11y.claude-prompt-meter?color=43853d)](https://marketplace.visualstudio.com/items?itemName=ryukenshin546-a11y.claude-prompt-meter)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/ryukenshin546-a11y.claude-prompt-meter)](https://marketplace.visualstudio.com/items?itemName=ryukenshin546-a11y.claude-prompt-meter&ssr=false#review-details)
+[![Open VSX](https://img.shields.io/open-vsx/v/ryukenshin546-a11y/claude-prompt-meter?label=Open%20VSX&color=8a5cb0)](https://open-vsx.org/extension/ryukenshin546-a11y/claude-prompt-meter)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-43853d.svg)](#-requirements--platform-support)
 [![Telemetry](https://img.shields.io/badge/telemetry-none-brightgreen.svg)](#-privacy)
-[![Languages](https://img.shields.io/badge/UI-Thai%20%C2%B7%20English-8a5cb0.svg)](#-usage)
+[![UI: Thai · English](https://img.shields.io/badge/UI-Thai%20%C2%B7%20English-8a5cb0.svg)](#-usage)
 
 <br/>
 
