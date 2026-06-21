@@ -4,7 +4,7 @@ const assert = require("node:assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { sessionStats, allSessions, costByDay } = require("../stats.js");
+const { sessionStats, allSessions, costByDay, ctxWarnState } = require("../stats.js");
 const { modelLabel, normalizeModelId, getPricingForModel, MODEL_PRICING } = require("../pricing.js");
 
 // Build a fake session file from JSONL lines and return its path.
@@ -182,6 +182,40 @@ test("per-file cache doesn't go stale when pricing changes", () => {
   const dear = sessionStats(f, { inputPerMillion: 50, outputPerMillion: 0, cacheReadPerMillion: 0, cacheCreatePerMillion: 0 }).session.cost;
   assert.ok(Math.abs(cheap - 3) < 0.01);
   assert.ok(Math.abs(dear - 50) < 0.01);   // recomputed, not served from the $3 cache entry
+});
+
+test("ctxWarnState fires once per climb past the threshold, re-arms after a drop", () => {
+  assert.deepEqual(ctxWarnState(99, 0, false), { warn: false, warned: false }); // threshold 0 = disabled
+  assert.deepEqual(ctxWarnState(80, 85, false), { warn: false, warned: false }); // below: quiet, not armed
+  assert.deepEqual(ctxWarnState(85, 85, false), { warn: true, warned: true });   // first crossing: warn + arm
+  assert.deepEqual(ctxWarnState(92, 85, true), { warn: false, warned: true });    // still high, already warned: quiet
+  assert.deepEqual(ctxWarnState(40, 85, true), { warn: false, warned: false });   // dropped (/clear,/compact): disarm
+});
+
+test("usageByWorkspace groups by cwd across projects and filters by month", () => {
+  const { usageByWorkspace } = require("../stats.js");
+  const base = path.join(os.tmpdir(), `cpm-ws-${process.pid}`);
+  const mk = (proj, lines) => {
+    const dir = path.join(base, proj);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "s.jsonl"), lines.map((l) => JSON.stringify(l)).join("\n"));
+  };
+  const u = (cwd, ts) => ({ type: "user", cwd, timestamp: ts, message: { content: "hi" } });
+  const opus1M = asstLine("claude-opus-4-8", { input_tokens: 1_000_000, output_tokens: 0 }); // $5
+  mk("projA", [u("/work/alpha", "2026-06-15T10:00:00Z"), opus1M]);                    // June $5
+  mk("projB", [u("/work/beta", "2026-06-20T10:00:00Z"), opus1M,
+               u("/work/beta", "2026-05-10T10:00:00Z"), opus1M]);                     // June $5 + May $5
+
+  const jun = usageByWorkspace("2026-06", undefined, base);
+  assert.equal(jun.workspaces.length, 2);
+  assert.equal(jun.total.prompts, 2);                       // May prompt excluded by month filter
+  assert.ok(Math.abs(jun.total.cost - 10) < 0.02);
+  assert.deepEqual(jun.workspaces.map((w) => w.name).sort(), ["alpha", "beta"]);
+  assert.ok(Math.abs(jun.workspaces.find((w) => w.name === "beta").cost - 5) < 0.02); // beta June only
+
+  const all = usageByWorkspace(null, undefined, base);       // all-time: includes May
+  assert.equal(all.total.prompts, 3);
+  assert.ok(Math.abs(all.total.cost - 15) < 0.02);
 });
 
 test("allSessions counts each session only after its own reset marker", () => {

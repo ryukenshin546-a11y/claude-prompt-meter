@@ -2,7 +2,7 @@
   "name": "claude-prompt-meter",
   "displayName": "Claude Prompt Meter",
   "description": "Per-prompt token & cost for Claude Code — live status-bar meter + dashboard with spend heatmap. Reads local logs only: no API key, no network. Thai/English.",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "publisher": "ryukenshin546-a11y",
   "license": "MIT",
   "icon": "icon.png",
@@ -127,6 +127,13 @@
           ],
           "default": null,
           "description": "Daily budget in USD; tooltip + dashboard show % used"
+        },
+        "claudePromptMeter.contextWarn.percent": {
+          "type": "number",
+          "default": 85,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Warn once when the context window gets this % full (re-sent history compounds cost — a cue to /clear or /compact). Set 0 to disable."
         }
       }
     }

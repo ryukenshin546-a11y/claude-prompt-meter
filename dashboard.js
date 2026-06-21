@@ -12,6 +12,8 @@ const T = {
         resetHint: "รีเซ็ต counter (ไม่ลบข้อมูลจริง)", help: "คู่มือ", langSwitch: "EN",
         diag: "วินิจฉัย", diagHint: "สร้างรายงานวินิจฉัย + คัดลอก (ส่งให้ผู้พัฒนาเวลามีปัญหา)",
         agentsTip: "รวมงาน sub-agent %n ตัว (อัปเดตจาก agent ที่ทำงานเบื้องหลัง)",
+        usageTitle: "การใช้งานรวมทุก workspace", thisMonthLabel: "เดือนนี้", usageAllWs: "รวมทุก workspace",
+        workspaces: "workspace", colWorkspace: "workspace", current: "ปัจจุบัน",
         helpContent: {
           title: "คู่มือการใช้งาน",
           cost: "ค่าใช้จ่าย", costDesc: "คำนวณจาก input + output + cache ตาม pricing ที่ตั้งไว้",
@@ -34,6 +36,8 @@ const T = {
         resetHint: "Reset counter (won't delete data)", help: "Help", langSwitch: "TH",
         diag: "Diagnostics", diagHint: "Build a diagnostics report + copy it (send to the developer when something's wrong)",
         agentsTip: "includes %n sub-agent(s) (updated from background agents)",
+        usageTitle: "Usage across all workspaces", thisMonthLabel: "this month", usageAllWs: "All workspaces",
+        workspaces: "workspaces", colWorkspace: "workspace", current: "current",
         helpContent: {
           title: "User Guide",
           cost: "Cost", costDesc: "Calculated from input + output + cache with configured pricing",
@@ -53,7 +57,7 @@ const T = {
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const k = (n) => (n >= 1000 ? (n / 1000).toFixed(1) + "k" : "" + n);
 
-function renderDashboard(stats, { lang = "th", budget = null, usd, sessions = [], resetTs = 0, currentSessionId = null, heatmap = {}, nonce = "" }) {
+function renderDashboard(stats, { lang = "th", budget = null, usd, sessions = [], resetTs = 0, currentSessionId = null, heatmap = {}, usage = null, nonce = "" }) {
   const t = T[lang];
   const s = stats.session;
   const prompts = stats.prompts;
@@ -188,6 +192,17 @@ function renderDashboard(stats, { lang = "th", budget = null, usd, sessions = []
 
   const h = t.helpContent;
 
+  // Monthly usage across all workspaces (grouped by recorded cwd), current one highlighted.
+  const usageBlock = (usage && usage.workspaces && usage.workspaces.length) ? `
+    <h2>${t.usageTitle} <span class="dim">· ${t.thisMonthLabel} (${usage.month})</span></h2>
+    <div class="grid">
+      <div class="card"><div class="label">${t.usageAllWs}</div><div class="bigval">${usd(usage.total.cost)}</div><div class="dim">${usage.total.prompts} ${t.prompts} · ${usage.workspaces.length} ${t.workspaces}</div></div>
+    </div>
+    <table class="ws-table">
+      <thead><tr><th>${t.colWorkspace}</th><th>${t.col.cost}</th><th>${t.prompts}</th></tr></thead>
+      <tbody>${usage.workspaces.map((w) => `<tr${w.current ? ' class="ws-current"' : ""}><td>${esc(w.name)}${w.current ? ` <span class="ws-badge">${t.current}</span>` : ""}</td><td class="cost">${usd(w.cost)}</td><td>${w.prompts}</td></tr>`).join("")}</tbody>
+    </table>` : "";
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'nonce-${nonce}';">
     <style>
@@ -222,6 +237,9 @@ function renderDashboard(stats, { lang = "th", budget = null, usd, sessions = []
     th:nth-child(2),td:nth-child(2) { text-align:left; }
     th { font-weight:600; opacity:.7; font-size:11px; text-transform:uppercase; }
     td.cost { color:var(--coral-soft); font-weight:600; }
+    .ws-table tr.ws-current td { background:rgba(176,80,47,.10); font-weight:600; }
+    .ws-badge { display:inline-block; margin-left:6px; padding:0 6px; border-radius:8px; font-size:10px; font-weight:600;
+                color:#fff; background:var(--coral); }
     .agbadge { display:inline-block; margin-left:4px; padding:0 5px; border-radius:8px; font-size:10px; font-weight:600;
                color:var(--coral-soft); background:rgba(176,80,47,.16); cursor:help; }
     .badge { display:inline-flex; align-items:center; gap:6px; font-size:12px; white-space:nowrap; }
@@ -299,6 +317,7 @@ function renderDashboard(stats, { lang = "th", budget = null, usd, sessions = []
         <svg class="spark" width="100%" height="68" viewBox="0 0 ${Math.max(prompts.length * 10, 100)} 68" preserveAspectRatio="none">${bars}</svg>
       </div>
     </div>
+    ${usageBlock}
     <h2>${t.perPrompt}</h2>
     <table>
       <thead><tr><th>${t.col.n}</th><th>${t.col.model}</th><th>${t.col.input}</th><th>${t.col.output}</th><th>${t.col.tools}</th><th>${t.col.ctx}</th><th>${t.col.cost}</th></tr></thead>

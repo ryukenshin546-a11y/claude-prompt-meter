@@ -2,12 +2,18 @@
 
 All notable changes to "Claude Prompt Meter" will be documented here.
 
+## [0.6.0] - 2026-06-21
+
+### Added
+- **Monthly usage across all workspaces.** The dashboard now shows a "Usage" section with this month's total cost/prompts summed across **every** Claude Code project, plus a per-workspace breakdown (the workspace you're in is highlighted). Sessions are grouped by the `cwd` recorded in each log — robust to slug-folder drift — so the total matches a monthly subscription view. Throttled (15s) so it never runs on the hot file-watch path.
+
 ## [0.5.0] - 2026-06-21
 
 ### Added
 - **Sub-agent token & cost accounting.** Work done by sub-agents (Workflow/Agent tool) is now folded into the prompt that spawned them — its tools count, output, and cost include the sub-agents' work, and a `⇲N` badge marks how many landed on that row. Previously a prompt that ran N agents showed only the spawn call, and the agents' (billed) tokens were invisible, undercounting session cost.
 - **Exact attribution via runId**, not timestamps — a background agent that finishes after you've typed later prompts still attributes to its real upline prompt.
 - **Diagnostics report** — a "Claude Prompt Meter" output channel plus a `Diagnostics (copy report)` command and a 🔍 button on the dashboard. Builds a local (no-network) report of platform/paths/parse status and copies it to the clipboard for bug reports.
+- **Context-pressure warning.** A one-time notification when the live session's context window crosses a fill threshold (default 85%) — re-sent history compounds cost every turn, so it's a cue to `/clear` (fresh start) or `/compact` (keep a summary). It fires once per climb and re-arms after the fill drops; the status-bar tooltip also flags the % when over. Configure or disable via `claudePromptMeter.contextWarn.percent` (0 disables).
 
 ### Changed
 - Cross-platform CI: the test suite now runs on macOS, Windows, and Linux.

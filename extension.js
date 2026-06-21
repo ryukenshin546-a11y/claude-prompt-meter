@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const crypto = require("crypto");
-const { sessionStats, latestJsonl, allSessions, costByDay, findProjectDir, projectDir, sessionCwd, DEFAULT_PRICING, WINDOW } = require("./stats.js");
+const { sessionStats, latestJsonl, allSessions, costByDay, usageByWorkspace, findProjectDir, projectDir, sessionCwd, ctxWarnState, DEFAULT_PRICING, WINDOW } = require("./stats.js");
 const { renderDashboard } = require("./dashboard.js");
 
 const L = {
@@ -15,7 +15,9 @@ const L = {
         sessCost: "ค่าใช้จ่ายรวมทั้ง session", openDash: "เปิด Dashboard",
         waiting: "รอข้อมูล…", noSession: "ไม่พบ session", switchTo: "สลับเป็น English",
         setBudgetPrompt: "งบประมาณรายวัน (USD) หรือเว้นว่างเพื่อลบ", invalidBudget: "งบไม่ถูกต้อง",
-        resetConfirm: "รีเซ็ต counter (ไม่ลบข้อมูลจริง)?", resetDone: "รีเซ็ตแล้ว — นับใหม่ตั้งแต่ตอนนี้" },
+        resetConfirm: "รีเซ็ต counter (ไม่ลบข้อมูลจริง)?", resetDone: "รีเซ็ตแล้ว — นับใหม่ตั้งแต่ตอนนี้",
+        ctxFull: "บริบทใกล้เต็ม",
+        ctxWarn: (pct) => `บริบทเต็ม ${pct}% แล้ว — ประวัติที่ส่งซ้ำทุกรอบทำให้ค่าใช้จ่ายทบ พิจารณา /clear (เริ่มใหม่) หรือ /compact (เก็บสรุป)` },
   en: { in: "in", out: "out", ctx: "ctx", tools: "tools", left: "left", cost: "cost",
         title: "Last prompt", roundtrips: "API roundtrips", session: "this session",
         inDesc: "input you typed (new tokens only)", outDesc: "output from AI + tools",
@@ -24,7 +26,9 @@ const L = {
         sessCost: "total session cost", openDash: "Open Dashboard",
         waiting: "waiting…", noSession: "no session", switchTo: "Switch to Thai",
         setBudgetPrompt: "Daily budget (USD), or leave blank to remove", invalidBudget: "Invalid budget",
-        resetConfirm: "Reset counter (won't delete data)?", resetDone: "Reset done — counting from now" },
+        resetConfirm: "Reset counter (won't delete data)?", resetDone: "Reset done — counting from now",
+        ctxFull: "context nearly full",
+        ctxWarn: (pct) => `Context ${pct}% full — re-sent history compounds cost each turn. Consider /clear (fresh start) or /compact (keep a summary).` },
 };
 
 function activate(ctx) {
@@ -43,6 +47,7 @@ function activate(ctx) {
     };
   };
   const dailyBudget = () => vscode.workspace.getConfiguration("claudePromptMeter.budget").get("dailyUsd", null);
+  const contextWarnPct = () => vscode.workspace.getConfiguration("claudePromptMeter.contextWarn").get("percent", 85);
 
   const bar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 1000);
   bar.command = "claudePromptMeter.openDashboard";
@@ -115,6 +120,7 @@ function activate(ctx) {
   let currentSessionId = null; // selected session id, or null when viewing live
   let panel = null;            // dashboard opened in the editor area
   let view = null;             // dashboard docked in the sidebar (Activity Bar)
+  const warnedCtx = {};        // sessionId -> already warned at the current climb? (re-arms when ctx drops)
 
   // id of the session the DASHBOARD shows (anchored to the loaded file, not recomputed live)
   const displayedId = () => currentSessionId || liveId;
@@ -139,12 +145,26 @@ function activate(ctx) {
     return { ...s, prompts: filtered, last: filtered[filtered.length - 1], session: { ...s.session, promptCount: filtered.length, cost } };
   };
 
+  // One-shot context-pressure warning for the LIVE session. Uses the true window
+  // fill (unaffected by the dashboard's reset filter); fires once per climb past
+  // the threshold and re-arms after /clear or /compact drops the fill back down.
+  const maybeWarnContext = () => {
+    const threshold = contextWarnPct();
+    const s = liveStats?.session;
+    if (!threshold || !s || !s.window) return;
+    const pct = Math.round((s.ctx / s.window) * 100);
+    const st = ctxWarnState(pct, threshold, !!warnedCtx[liveId]);
+    warnedCtx[liveId] = st.warned;
+    if (st.warn) vscode.window.showWarningMessage(L[lang()].ctxWarn(pct));
+  };
+
   const render = () => {
     const t = L[lang()];
     // Status bar always reflects the LIVE session, independent of any dashboard selection.
     const live = liveStats ? filterByReset(liveStats, liveId) : null;
     if (!live || !live.prompts.length) { bar.text = `$(comment-discussion) ${t.waiting}`; bar.tooltip = t.noSession; }
     else { renderBar(live, t); }
+    maybeWarnContext();
     if (panel || view) {
       const html = dashHtml();
       if (panel) panel.webview.html = html;
@@ -165,7 +185,10 @@ function activate(ctx) {
     md.appendMarkdown(`$(arrow-up) **${p.input.toLocaleString()}** — ${t.inDesc}\n\n`);
     md.appendMarkdown(`$(arrow-down) **${p.output.toLocaleString()}** — ${t.outDesc}\n\n`);
     md.appendMarkdown(`$(tools) **${p.calls}** — ${t.toolsDesc}\n\n`);
-    md.appendMarkdown(`$(archive) **${p.ctx.toLocaleString()}** / ${(sess.window || WINDOW).toLocaleString()} — ${t.ctxDesc}\n\n`);
+    const ctxPct = sess.window ? Math.round((sess.ctx / sess.window) * 100) : 0;
+    const ctxWarnAt = contextWarnPct();
+    const ctxFlag = ctxWarnAt && ctxPct >= ctxWarnAt ? ` $(warning) ${ctxPct}% — ${t.ctxFull}` : "";
+    md.appendMarkdown(`$(archive) **${p.ctx.toLocaleString()}** / ${(sess.window || WINDOW).toLocaleString()} — ${t.ctxDesc}${ctxFlag}\n\n`);
     md.appendMarkdown(`$(dashboard) **${sess.left.toLocaleString()}** — ${t.leftDesc}\n\n`);
     md.appendMarkdown(`$(credit-card) **${usd(p.cost)}** — ${t.costDesc}\n\n`);
     md.appendMarkdown(`---\n\n`);
@@ -182,11 +205,27 @@ function activate(ctx) {
 
   // One dashboard HTML builder + one message handler, shared by the editor panel
   // and the sidebar view.
+  // Monthly usage across ALL workspaces (grouped by recorded cwd). Throttled —
+  // a monthly total needn't be recomputed on every 1.5s file-watch tick.
+  const normP = (p) => (p ? path.normalize(p).replace(/[\\/]+$/, "").toLowerCase() : null);
+  const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+  let _usage = null; // { at, month, data }
+  const monthlyUsage = () => {
+    const month = thisMonth();
+    if (_usage && _usage.month === month && Date.now() - _usage.at < 15000) return _usage.data;
+    const data = usageByWorkspace(month, pricing());
+    const cur = normP(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath);
+    for (const w of data.workspaces) w.current = !!cur && normP(w.cwd) === cur;
+    data.month = month;
+    _usage = { at: Date.now(), month, data };
+    return data;
+  };
+
   const dashHtml = () => {
     if (!stats) return `<!DOCTYPE html><html><body style="padding:14px;font-family:sans-serif;color:var(--vscode-foreground);background:var(--vscode-editor-background)">${L[lang()].waiting}</body></html>`;
     const heatmap = dir && fs.existsSync(dir) ? costByDay(dir, pricing()) : {};
     const nonce = crypto.randomBytes(16).toString("base64");
-    return renderDashboard(filterByReset(stats, displayedId()), { lang: lang(), budget: dailyBudget(), usd, sessions, resetTs: markerFor(displayedId()), currentSessionId, heatmap, nonce });
+    return renderDashboard(filterByReset(stats, displayedId()), { lang: lang(), budget: dailyBudget(), usd, sessions, resetTs: markerFor(displayedId()), currentSessionId, heatmap, usage: monthlyUsage(), nonce });
   };
   const onWebviewMsg = async (msg) => {
     if (msg.command === "selectSession") {

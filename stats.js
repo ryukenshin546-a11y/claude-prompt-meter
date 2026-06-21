@@ -241,6 +241,15 @@ function sessionStats(file, userPricing = DEFAULT_PRICING) {
   return result;
 }
 
+// Context-pressure warning state machine (pure, so it's unit-testable).
+// Fire once when fill% first reaches the threshold, then stay quiet until it
+// drops back below (after /clear or /compact) — which re-arms it for the next
+// climb. threshold 0 disables. Returns { warn (fire now?), warned (new state) }.
+function ctxWarnState(pct, threshold, wasWarned) {
+  if (!threshold || pct < threshold) return { warn: false, warned: false };
+  return { warn: !wasWarned, warned: true };
+}
+
 function latestJsonl(dir) {
   try {
     const files = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl"));
@@ -319,6 +328,36 @@ function costByDay(dir, userPricing = DEFAULT_PRICING) {
   return out;
 }
 
+// Aggregate usage across ALL projects under `base`, grouped by the workspace
+// `cwd` recorded in each session (ground truth — so one workspace split across
+// slug folders merges correctly). monthPrefix like "2026-06" filters by local
+// day; null = all-time. Returns { total:{cost,prompts}, workspaces:[{name,cwd,cost,prompts}] }.
+function usageByWorkspace(monthPrefix = null, userPricing = DEFAULT_PRICING, base = path.join(os.homedir(), ".claude", "projects")) {
+  let dirs;
+  try { dirs = fs.readdirSync(base); } catch { return { total: { cost: 0, prompts: 0 }, workspaces: [] }; }
+  const byWs = new Map(); // normalized cwd -> { name, cwd, cost, prompts }
+  for (const d of dirs) {
+    const dir = path.join(base, d);
+    const lf = latestJsonl(dir);
+    if (!lf) continue;
+    const cwd = sessionCwd(lf);
+    const key = cwd ? normPath(cwd) : "slug:" + d;
+    const name = cwd ? path.basename(cwd.replace(/[\\/]+$/, "")) : d;
+    let cost = 0, prompts = 0;
+    for (const [day, v] of Object.entries(costByDay(dir, userPricing))) {
+      if (monthPrefix && !day.startsWith(monthPrefix)) continue;
+      cost += v.cost; prompts += v.prompts;
+    }
+    if (!cost && !prompts) continue;
+    const ws = byWs.get(key) || { name, cwd: cwd || null, cost: 0, prompts: 0 };
+    ws.cost += cost; ws.prompts += prompts;
+    byWs.set(key, ws);
+  }
+  const workspaces = [...byWs.values()].sort((a, b) => b.cost - a.cost);
+  const total = workspaces.reduce((t, w) => ({ cost: t.cost + w.cost, prompts: t.prompts + w.prompts }), { cost: 0, prompts: 0 });
+  return { total, workspaces };
+}
+
 // Read the cwd a session was recorded in (appears in the first few lines).
 function sessionCwd(file) {
   try {
@@ -360,4 +399,4 @@ function projectDir(root) {
   return path.join(os.homedir(), ".claude", "projects", slug);
 }
 
-module.exports = { sessionStats, latestJsonl, allSessions, costByDay, projectDir, findProjectDir, sessionCwd, costOf, DEFAULT_PRICING, WINDOW, getPricingForModel, normalizeModelId };
+module.exports = { sessionStats, latestJsonl, allSessions, costByDay, usageByWorkspace, projectDir, findProjectDir, sessionCwd, costOf, ctxWarnState, DEFAULT_PRICING, WINDOW, getPricingForModel, normalizeModelId };
